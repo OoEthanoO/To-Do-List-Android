@@ -19,7 +19,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,7 +51,7 @@ import kotlin.random.Random
 data class Task(
     val id: Int,
     val title: String,
-    val isComplete: Boolean = false
+    var isComplete: Boolean = false
 )
 
 private var taskList by mutableStateOf(listOf<Task>())
@@ -125,7 +127,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun TaskListScreen(navController: NavHostController, tasks: List<Task>, onDelete: (Int) -> Unit, onCompleteToggle: (Int) -> Unit) {
         var textValue by remember { mutableStateOf("") }
@@ -138,61 +139,37 @@ class MainActivity : ComponentActivity() {
                 style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 36.sp)
             )
 
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(16.dp)
-            ) {
-                items(tasks.size) { index ->
-                    TaskRow(
-                        task = tasks[index],
-                        onDelete = { onDelete(index) },
-                        onCompleteToggle = { onCompleteToggle(index) },
-                        onClick = { navController.navigate(Screen.TaskDetailScreen(tasks[index].id).createRoute(tasks[index].id)) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    if (index < tasks.size - 1) {
-                        Divider()
-                    }
+            TaskList(tasks = tasks, onDelete = onDelete, onCompleteToggle = onCompleteToggle, navController = navController, modifier = Modifier.weight(1f))
+
+            Row {
+                InputBox(
+                    textValue = textValue,
+                    onValueChange = { textValue = it },
+                    onDone = {
+                        val newTask = Task(id = Random.nextInt(), textValue.trimEnd { it == '\n' })
+                        taskList = taskList + newTask
+                        textValue = ""
+                        saveTasks()
+                    },
+                    modifier = Modifier.weight(8f)
+                )
+                TextButton (
+                    onClick = {},
+                    modifier = Modifier
+                        .weight(2f)
+                        .padding(top = 4.dp)
+                ) {
+                    Text("Add")
                 }
             }
-
-            TextField(
-                value = textValue,
-                onValueChange = { textValue = it },
-                label = { Text("Add new task") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onKeyEvent { it ->
-                        if (it.key == Key.Enter && it.type == KeyEventType.KeyUp) {
-                            if (textValue.isNotBlank()) {
-                                val newTask = Task(id = Random.nextInt(), textValue.trimEnd { it == '\n' })
-                                taskList = taskList + newTask
-                                textValue = ""
-                                saveTasks()
-                            }
-                            true
-                        } else {
-                            false
-                        }
-                    },
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        if (textValue.isNotBlank()) {
-                            val newTask = Task(id = Random.nextInt(), textValue)
-                            taskList = taskList + newTask
-                            textValue = ""
-                            saveTasks()
-                        }
-                    }
-                ),
-                singleLine = true
-            )
         }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun TaskDetailScreen(navController: NavHostController, task: Task?) {
+        var taskTitle by remember { mutableStateOf(task?.title ?: "") }
+
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { navController.popBackStack() }) {
@@ -207,18 +184,47 @@ class MainActivity : ComponentActivity() {
                 style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 32.sp)
             )
             if (task != null) {
-                Text(
-                    task.title,
-                    modifier = Modifier.padding(50.dp),
-                    style = TextStyle(fontSize = 18.sp)
+                TextField(
+                    value = taskTitle,
+                    onValueChange = { newTitle ->
+                        if (newTitle.isNotBlank()) {
+                            taskTitle = newTitle
+                            taskList = taskList.map {
+                                if (it.id == task.id) it.copy(title = newTitle) else it
+                            }
+                            saveTasks()
+                        }
+                    },
+                    modifier = Modifier
+                        .padding(start = 34.dp, end = 50.dp, top = 50.dp)
+                        .fillMaxWidth(),
+                    label = { Text("Task Title") },
+                    singleLine = true,
+                    colors = TextFieldDefaults.textFieldColors(containerColor = Color.Transparent)
                 )
+
+                Row (modifier = Modifier
+                    .padding(start = 50.dp, end = 50.dp, top = 25.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Mark Complete", modifier = Modifier.weight(1f))
+                    Checkbox(
+                        checked = task.isComplete,
+                        onCheckedChange = {
+                            val taskIndex = taskList.indexOfFirst { it.id == task.id }
+                            if (taskIndex != -1) {
+                                toggleCompleteTask(taskIndex)
+                            }
+                        }
+                    )
+                }
             }
         }
     }
 
     @Composable
     fun TaskRow(task: Task, onDelete: () -> Unit, onCompleteToggle: () -> Unit, onClick: () -> Unit, modifier: Modifier = Modifier) {
-         Row(
+        Row(
             modifier = modifier.clickable(onClick = onClick),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -239,6 +245,57 @@ class MainActivity : ComponentActivity() {
                 Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
             }
         }
+    }
 
+    @Composable
+    fun TaskList(tasks: List<Task>, onDelete: (Int) -> Unit, onCompleteToggle: (Int) -> Unit, navController: NavHostController, modifier: Modifier = Modifier) {
+        LazyColumn(
+            modifier = modifier
+                .padding(16.dp)
+        ) {
+            items(tasks.size) { index ->
+                TaskRow(
+                    task = tasks[index],
+                    onDelete = { onDelete(index) },
+                    onCompleteToggle = { onCompleteToggle(index) },
+                    onClick = { navController.navigate(Screen.TaskDetailScreen(tasks[index].id).createRoute(tasks[index].id)) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (index < tasks.size - 1) {
+                    Divider()
+                }
+            }
+        }
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun InputBox(textValue: String, onValueChange: (String) -> Unit, onDone: () -> Unit, modifier: Modifier) {
+        TextField(
+            value = textValue,
+            onValueChange = onValueChange,
+            label = { Text("Add new task") },
+            modifier = modifier
+                .fillMaxWidth()
+                .onKeyEvent {
+                    if (it.key == Key.Enter && it.type == KeyEventType.KeyUp) {
+                        if (textValue.isNotBlank()) {
+                            onDone()
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                },
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    if (textValue.isNotBlank()) {
+                        onDone()
+                    }
+                }
+            ),
+            singleLine = true,
+            colors = TextFieldDefaults.textFieldColors(containerColor = Color.Transparent)
+        )
     }
 }
