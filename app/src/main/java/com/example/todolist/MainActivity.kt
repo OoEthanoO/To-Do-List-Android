@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,7 +37,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -44,26 +45,12 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.todolist.ui.theme.TaskDetailScreen
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlin.random.Random
 
-data class Task(
-    val id: Int,
-    val title: String,
-    var isComplete: Boolean = false
-)
-
 private var taskList by mutableStateOf(listOf<Task>())
-
-sealed class Screen(val route: String) {
-    object TaskListScreen : Screen("task_list")
-    data class TaskDetailScreen(val taskId: Int) : Screen("taskDetail/{taskId}") {
-        fun createRoute(taskId: Int): String {
-            return "taskDetail/$taskId"
-        }
-    }
-}
 
 class MainActivity : ComponentActivity() {
     private lateinit var sharedPreferences: SharedPreferences
@@ -119,10 +106,20 @@ class MainActivity : ComponentActivity() {
             composable(Screen.TaskListScreen.route) {
                 TaskListScreen(navController = navController, tasks = taskList, onDelete = ::deleteTask, onCompleteToggle = ::toggleCompleteTask)
             }
+
+            fun updateTaskTitle(taskId: Int, newTitle: String) {
+                val taskIndex = taskList.indexOfFirst { it.id == taskId }
+                if (taskIndex != -1) {
+                    taskList = taskList.toMutableList().apply {
+                        this[taskIndex] = this[taskIndex].copy(title = newTitle)
+                    }
+                }
+            }
+
             composable("taskDetail/{taskId}") { backStackEntry ->
                 val taskId = backStackEntry.arguments?.getString("taskId")?.toIntOrNull()
                 val task = taskList.find { it.id == taskId }
-                TaskDetailScreen(navController = navController, task = task)
+                TaskDetailScreen(navController = navController, task = task, taskList = taskList, saveTasks = ::saveTasks, updateTaskTitle = ::updateTaskTitle, toggleCompleteTask = ::toggleCompleteTask)
             }
         }
     }
@@ -141,7 +138,7 @@ class MainActivity : ComponentActivity() {
 
             TaskList(tasks = tasks, onDelete = onDelete, onCompleteToggle = onCompleteToggle, navController = navController, modifier = Modifier.weight(1f))
 
-            Row {
+            Row (verticalAlignment = Alignment.CenterVertically){
                 InputBox(
                     textValue = textValue,
                     onValueChange = { textValue = it },
@@ -153,6 +150,11 @@ class MainActivity : ComponentActivity() {
                     },
                     modifier = Modifier.weight(8f)
                 )
+
+                Icon(Icons.Default.Warning, contentDescription = "")
+
+                PriorityPicker(modifier = Modifier.weight(1f))
+
                 TextButton (
                     onClick = {},
                     modifier = Modifier
@@ -160,63 +162,6 @@ class MainActivity : ComponentActivity() {
                         .padding(top = 4.dp)
                 ) {
                     Text("Add")
-                }
-            }
-        }
-    }
-
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
-    fun TaskDetailScreen(navController: NavHostController, task: Task?) {
-        var taskTitle by remember { mutableStateOf(task?.title ?: "") }
-
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { navController.popBackStack() }) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Go back")
-                }
-                Text("To Do List", style = TextStyle(fontSize = 18.sp))
-            }
-            Text(
-                "Edit Task",
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-                style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 32.sp)
-            )
-            if (task != null) {
-                TextField(
-                    value = taskTitle,
-                    onValueChange = { newTitle ->
-                        if (newTitle.isNotBlank()) {
-                            taskTitle = newTitle
-                            taskList = taskList.map {
-                                if (it.id == task.id) it.copy(title = newTitle) else it
-                            }
-                            saveTasks()
-                        }
-                    },
-                    modifier = Modifier
-                        .padding(start = 34.dp, end = 50.dp, top = 50.dp)
-                        .fillMaxWidth(),
-                    label = { Text("Task Title") },
-                    singleLine = true,
-                    colors = TextFieldDefaults.textFieldColors(containerColor = Color.Transparent)
-                )
-
-                Row (modifier = Modifier
-                    .padding(start = 50.dp, end = 50.dp, top = 25.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Mark Complete", modifier = Modifier.weight(1f))
-                    Checkbox(
-                        checked = task.isComplete,
-                        onCheckedChange = {
-                            val taskIndex = taskList.indexOfFirst { it.id == task.id }
-                            if (taskIndex != -1) {
-                                toggleCompleteTask(taskIndex)
-                            }
-                        }
-                    )
                 }
             }
         }
@@ -297,5 +242,27 @@ class MainActivity : ComponentActivity() {
             singleLine = true,
             colors = TextFieldDefaults.textFieldColors(containerColor = Color.Transparent)
         )
+    }
+    
+    @Composable
+    fun PriorityPicker(modifier: Modifier) {
+        val options = listOf("None", "Low", "Medium", "High")
+        var expanded by remember { mutableStateOf(false) }
+        var selectedOption by remember { mutableStateOf(options[0]) }
+
+        Box(modifier = modifier.wrapContentSize()) {
+            Text(text = selectedOption, modifier = modifier.clickable {expanded = true } )
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            selectedOption = option
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
     }
 }
