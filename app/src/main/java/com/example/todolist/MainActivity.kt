@@ -138,7 +138,9 @@ class MainActivity : ComponentActivity() {
 
             TaskList(tasks = tasks, onDelete = onDelete, onCompleteToggle = onCompleteToggle, navController = navController, modifier = Modifier.weight(1f))
 
-            Row (verticalAlignment = Alignment.CenterVertically){
+            Row (
+                verticalAlignment = Alignment.CenterVertically
+            ){
                 InputBox(
                     textValue = textValue,
                     onValueChange = { textValue = it },
@@ -151,15 +153,14 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.weight(8f)
                 )
 
-                Icon(Icons.Default.Warning, contentDescription = "")
+                Icon(Icons.Default.Warning, contentDescription = "", modifier = Modifier.padding(start = 8.dp))
 
-                PriorityPicker(modifier = Modifier.weight(1f))
+                PriorityPicker(modifier = Modifier.weight(2f))
 
                 TextButton (
                     onClick = {},
                     modifier = Modifier
                         .weight(2f)
-                        .padding(top = 4.dp)
                 ) {
                     Text("Add")
                 }
