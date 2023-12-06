@@ -1,4 +1,4 @@
-package com.example.todolist.ui.theme
+package com.example.todolist
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,7 +27,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import com.example.todolist.Task
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,6 +78,17 @@ fun TaskDetailScreen(navController: NavHostController, task: Task?, taskList: Li
                         }
                     }
                 )
+            }
+
+            Row(modifier = Modifier
+                .padding(start = 50.dp, end = 50.dp, top = 25.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Priority", modifier = Modifier.weight(1f))
+                var selectedOption by remember { mutableStateOf(task.priority) }
+                PriorityPicker(modifier = Modifier.weight(2f)) { newPriority ->
+                    selectedOption = newPriority
+                }
             }
         }
     }
