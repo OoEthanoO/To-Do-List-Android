@@ -8,23 +8,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -33,10 +26,6 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -48,7 +37,7 @@ import com.google.gson.reflect.TypeToken
 import kotlin.random.Random
 
 private var taskList by mutableStateOf(listOf<Task>())
-private lateinit var sharedPreferences: SharedPreferences
+lateinit var sharedPreferences: SharedPreferences
 
 class MainActivity : ComponentActivity() {
 
@@ -60,6 +49,9 @@ class MainActivity : ComponentActivity() {
         for (task in taskList) {
             if (task.priority == null) {
                 task.priority = "None"
+            }
+            if (task.createdAt == 0L) {
+                task.createdAt = System.currentTimeMillis()
             }
             saveTasks()
         }
@@ -84,14 +76,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun deleteTask(index: Int) {
-        taskList = taskList.toMutableList().apply { removeAt(index) }
+    private fun deleteTask(taskId: Int) {
+        taskList = taskList.filter { it.id != taskId }
         saveTasks()
     }
 
-    private fun toggleCompleteTask(index: Int) {
-        taskList = taskList.toMutableList().apply {
-            this[index] = this[index].copy(isComplete = !this[index].isComplete)
+    private fun toggleCompleteTask(taskId: Int) {
+        taskList = taskList.map { task ->
+            if (task.id == taskId) {
+                task.copy(isComplete = !task.isComplete)
+            } else {
+                task
+            }
+        }
+        saveTasks()
+    }
+
+    private fun toggleHaveDueDate(taskId: Int) {
+        taskList = taskList.map { task ->
+            if (task.id == taskId) {
+                task.copy(haveDueDate = !task.haveDueDate)
+            } else {
+                task
+            }
         }
         saveTasks()
     }
@@ -101,7 +108,7 @@ class MainActivity : ComponentActivity() {
         val navController = rememberNavController()
         NavHost(navController = navController, startDestination = Screen.TaskListScreen.route) {
             composable(Screen.TaskListScreen.route) {
-                TaskListScreen(navController = navController, tasks = taskList, onDelete = ::deleteTask, onCompleteToggle = ::toggleCompleteTask)
+                TaskListScreen(navController = navController, tasks = taskList, onDelete = ::deleteTask, onCompleteToggle = ::toggleCompleteTask, sharedPreferences)
             }
 
             fun updateTaskTitle(taskId: Int, newTitle: String) {
@@ -116,17 +123,17 @@ class MainActivity : ComponentActivity() {
             composable("taskDetail/{taskId}") { backStackEntry ->
                 val taskId = backStackEntry.arguments?.getString("taskId")?.toIntOrNull()
                 val task = taskList.find { it.id == taskId }
-                TaskDetailScreen(navController = navController, task = task, taskList = taskList, saveTasks = ::saveTasks, updateTaskTitle = ::updateTaskTitle, toggleCompleteTask = ::toggleCompleteTask)
+                TaskDetailScreen(navController = navController, task = task, saveTasks = ::saveTasks, updateTaskTitle = ::updateTaskTitle, toggleCompleteTask = ::toggleCompleteTask, toggleHaveDueDate = ::toggleHaveDueDate)
             }
         }
     }
 }
 
 @Composable
-fun PriorityPicker(modifier: Modifier, onPriorityChange: (String) -> Unit) {
+fun PriorityPicker(modifier: Modifier, onPriorityChange: (String) -> Unit, startingOption: String = "None") {
     val options = listOf("None", "Low", "Medium", "High")
     var expanded by remember { mutableStateOf(false) }
-    var selectedOption by remember { mutableStateOf(options[0]) }
+    var selectedOption by remember { mutableStateOf(startingOption) }
 
     Box(modifier = modifier.wrapContentSize()) {
         Text(text = selectedOption, modifier = modifier.clickable {expanded = true } )
@@ -151,6 +158,33 @@ fun PriorityPicker(modifier: Modifier, onPriorityChange: (String) -> Unit) {
 }
 
 @Composable
+fun SortByPicker(modifier: Modifier, onPriorityChange: (String) -> Unit, startingOption: String = "Creation Date") {
+    val options = listOf("Creation Date", "Completion", "Priority", "Title")
+    var expanded by remember { mutableStateOf(false) }
+    var selectedOption by remember { mutableStateOf(startingOption) }
+
+    Box(modifier = modifier.wrapContentSize()) {
+        Text(text = selectedOption, modifier = modifier.clickable {expanded = true } )
+    }
+
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = { expanded = false }
+    ) {
+        options.forEach { option ->
+            DropdownMenuItem(
+                text = { Text(option) },
+                onClick = {
+                    selectedOption = option
+                    onPriorityChange(option)
+                    expanded = false
+                }
+            )
+        }
+    }
+}
+
+@Composable
 fun TaskList(tasks: List<Task>, onDelete: (Int) -> Unit, onCompleteToggle: (Int) -> Unit, navController: NavHostController, modifier: Modifier = Modifier) {
     LazyColumn(
         modifier = modifier
@@ -159,71 +193,14 @@ fun TaskList(tasks: List<Task>, onDelete: (Int) -> Unit, onCompleteToggle: (Int)
         items(tasks.size) { index ->
             TaskRow(
                 task = tasks[index],
-                onDelete = { onDelete(index) },
-                onCompleteToggle = { onCompleteToggle(index) },
+                onDelete = { onDelete(tasks[index].id) },
+                onCompleteToggle = { onCompleteToggle(tasks[index].id) },
                 onClick = { navController.navigate(Screen.TaskDetailScreen(tasks[index].id).createRoute(tasks[index].id)) },
                 modifier = Modifier.fillMaxWidth()
             )
             if (index < tasks.size - 1) {
                 Divider()
             }
-        }
-    }
-}
-
-@Composable
-fun TaskRow(task: Task, onDelete: () -> Unit, onCompleteToggle: () -> Unit, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier.clickable(onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Checkbox(
-            checked = task.isComplete,
-            onCheckedChange = { onCompleteToggle() }
-        )
-        if (task.priority != "None") {
-            Icon(
-                Icons.Default.Warning,
-                contentDescription = "",
-                tint = when (task.priority) {
-                    "Low" -> Color.Green
-                    "Medium" -> Color.Yellow
-                    else -> Color.Red
-                },
-                modifier = Modifier.padding(end = 8.dp)
-            )
-        }
-
-        Text(
-            text = buildAnnotatedString {
-                withStyle(style = SpanStyle(textDecoration = if (task.isComplete) TextDecoration.LineThrough else TextDecoration.None)) {
-                    append(task.title)
-                }
-            },
-            color =
-            if (task.isComplete) {
-                Color.Gray
-            } else {
-                when (task.priority) {
-                    "Low" -> {
-                        Color.Green
-                    }
-                    "Medium" -> {
-                        Color(0xFFffe000)
-                    }
-                    "High" -> {
-                        Color.Red
-                    }
-                    else -> {
-                        Color.Black
-                    }
-                }
-            },
-            modifier = Modifier.weight(1f)
-        )
-        IconButton(onClick = onDelete) {
-            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
         }
     }
 }
@@ -264,7 +241,7 @@ fun addTask(textValue: String, priority: String) {
     if (actualTextValue.isBlank()) {
         return
     }
-    val newTask = Task(id = Random.nextInt(), textValue.trimEnd { it == '\n' }, priority = priority)
+    val newTask = Task(id = Random.nextInt(), textValue.trimEnd { it == '\n' }, priority = priority, createdAt = (System.currentTimeMillis() + 7))
     taskList = taskList + newTask
     saveTasks()
 }

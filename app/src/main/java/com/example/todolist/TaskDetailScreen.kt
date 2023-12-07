@@ -30,7 +30,7 @@ import androidx.navigation.NavHostController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskDetailScreen(navController: NavHostController, task: Task?, taskList: List<Task>, saveTasks: () -> Unit, updateTaskTitle: (Int, String) -> Unit, toggleCompleteTask: (Int) -> Unit) {
+fun TaskDetailScreen(navController: NavHostController, task: Task?, saveTasks: () -> Unit, updateTaskTitle: (Int, String) -> Unit, toggleCompleteTask: (Int) -> Unit, toggleHaveDueDate: (Int) -> Unit) {
     var taskTitle by remember { mutableStateOf(task?.title ?: "") }
 
     Column {
@@ -72,10 +72,7 @@ fun TaskDetailScreen(navController: NavHostController, task: Task?, taskList: Li
                 Checkbox(
                     checked = task.isComplete,
                     onCheckedChange = {
-                        val taskIndex = taskList.indexOfFirst { it.id == task.id }
-                        if (taskIndex != -1) {
-                            toggleCompleteTask(taskIndex)
-                        }
+                        toggleCompleteTask(task.id)
                     }
                 )
             }
@@ -85,10 +82,23 @@ fun TaskDetailScreen(navController: NavHostController, task: Task?, taskList: Li
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Priority", modifier = Modifier.weight(1f))
-                var selectedOption by remember { mutableStateOf(task.priority) }
-                PriorityPicker(modifier = Modifier.weight(2f)) { newPriority ->
-                    selectedOption = newPriority
-                }
+                PriorityPicker(modifier = Modifier.padding(end = 4.dp), onPriorityChange = { newPriority: String ->
+                    task.priority = newPriority
+                    saveTasks()
+                }, startingOption = task.priority)
+            }
+
+            Row(modifier = Modifier
+                .padding(start = 50.dp, end = 50.dp, top = 25.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Due Date", modifier = Modifier.weight(1f))
+                Checkbox(
+                    checked = task.haveDueDate,
+                    onCheckedChange = {
+                        toggleHaveDueDate(task.id)
+                    }
+                )
             }
         }
     }
