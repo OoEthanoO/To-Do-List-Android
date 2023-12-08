@@ -1,9 +1,11 @@
 package com.example.todolist
 
 import android.content.*
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,6 +43,7 @@ lateinit var sharedPreferences: SharedPreferences
 
 class MainActivity : ComponentActivity() {
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         sharedPreferences = getSharedPreferences("ToDoList", MODE_PRIVATE)
@@ -92,17 +95,7 @@ class MainActivity : ComponentActivity() {
         saveTasks()
     }
 
-    private fun toggleHaveDueDate(taskId: Int) {
-        taskList = taskList.map { task ->
-            if (task.id == taskId) {
-                task.copy(haveDueDate = !task.haveDueDate)
-            } else {
-                task
-            }
-        }
-        saveTasks()
-    }
-
+    @RequiresApi(Build.VERSION_CODES.O)
     @Composable
     fun Navigation() {
         val navController = rememberNavController()
@@ -123,7 +116,13 @@ class MainActivity : ComponentActivity() {
             composable("taskDetail/{taskId}") { backStackEntry ->
                 val taskId = backStackEntry.arguments?.getString("taskId")?.toIntOrNull()
                 val task = taskList.find { it.id == taskId }
-                TaskDetailScreen(navController = navController, task = task, saveTasks = ::saveTasks, updateTaskTitle = ::updateTaskTitle, toggleCompleteTask = ::toggleCompleteTask, toggleHaveDueDate = ::toggleHaveDueDate)
+                TaskDetailScreen(
+                    navController = navController,
+                    task = task,
+                    saveTasks = ::saveTasks,
+                    updateTaskTitle = ::updateTaskTitle,
+                    toggleCompleteTask = ::toggleCompleteTask
+                )
             }
         }
     }

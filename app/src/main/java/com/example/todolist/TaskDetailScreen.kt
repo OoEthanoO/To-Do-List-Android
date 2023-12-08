@@ -1,5 +1,8 @@
 package com.example.todolist
 
+import android.app.DatePickerDialog
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,21 +24,57 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import java.time.LocalDate
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskDetailScreen(navController: NavHostController, task: Task?, saveTasks: () -> Unit, updateTaskTitle: (Int, String) -> Unit, toggleCompleteTask: (Int) -> Unit, toggleHaveDueDate: (Int) -> Unit) {
+fun TaskDetailScreen(
+    navController: NavHostController,
+    task: Task?,
+    saveTasks: () -> Unit,
+    updateTaskTitle: (Int, String) -> Unit,
+    toggleCompleteTask: (Int) -> Unit
+) {
     var taskTitle by remember { mutableStateOf(task?.title ?: "") }
+    val selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    val showDatePicker = remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    if (showDatePicker.value) {
+        val datePickerDialog = DatePickerDialog(context, { _, _, _, _ ->
+            task?.let {
+                it.dueDate = selectedDate
+                it.haveDueDate = true
+                saveTasks()
+            }
+            showDatePicker.value = false
+        }, selectedDate.year, selectedDate.monthValue - 1, selectedDate.dayOfMonth)
+
+        datePickerDialog.setOnDismissListener {
+            if (task != null) {
+                task.haveDueDate = false
+                saveTasks()
+            }
+            showDatePicker.value = false
+        }
+
+        datePickerDialog.show()
+    }
 
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { navController.popBackStack() }) {
+            IconButton(onClick = {
+                saveTasks()
+                navController.popBackStack()
+            }) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Go back")
             }
             Text("To Do List", style = TextStyle(fontSize = 18.sp))
@@ -95,10 +134,20 @@ fun TaskDetailScreen(navController: NavHostController, task: Task?, saveTasks: (
                 Text("Due Date", modifier = Modifier.weight(1f))
                 Checkbox(
                     checked = task.haveDueDate,
-                    onCheckedChange = {
-                        toggleHaveDueDate(task.id)
+                    onCheckedChange = { isChecked ->
+                        task.haveDueDate = isChecked
+                        if (isChecked) {
+                            showDatePicker.value = true
+                        } else {
+                            task.dueDate = null
+                        }
+                        saveTasks()
                     }
                 )
+            }
+
+            if (task.haveDueDate) {
+                Text("Selected Date: $selectedDate", modifier = Modifier.padding(start = 50.dp, top = 10.dp))
             }
         }
     }
