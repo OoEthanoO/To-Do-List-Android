@@ -9,6 +9,7 @@ This is a simple To Do List application built with Kotlin and Jetpack Compose. T
 - Delete tasks
 - Mark tasks as complete or incomplete
 - Prioritize tasks
+- Add due date to tasks
 
 ## Technologies Used
 
@@ -25,7 +26,7 @@ This is a simple To Do List application built with Kotlin and Jetpack Compose. T
 ## Usage
 
 - To add a new task, enter the task title in the input box and click on the "Add" button.
-- To edit a task, click on the task in the list. This will navigate to the task detail screen where you can edit the task title.
+- To edit a task, click on the task in the list. This will navigate to the task detail screen where you can edit the difference aspects of the task.
 - To delete a task, click on the delete icon next to the task in the list.
 - To mark a task as complete, click on the checkbox next to the task in the list.
 
