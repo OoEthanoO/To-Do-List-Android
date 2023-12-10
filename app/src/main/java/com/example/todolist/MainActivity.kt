@@ -84,10 +84,39 @@ class MainActivity : ComponentActivity() {
         saveTasks()
     }
 
+    /* helper function to clear all tasks
+    private fun clearTasks() {
+        taskList = emptyList()
+        saveTasks()
+    }
+    */
+
     private fun toggleCompleteTask(taskId: Int) {
         taskList = taskList.map { task ->
             if (task.id == taskId) {
                 task.copy(isComplete = !task.isComplete)
+            } else {
+                task
+            }
+        }
+        saveTasks()
+    }
+
+    private fun toggleHaveDueDate(taskId: Int) {
+        taskList = taskList.map { task ->
+            if (task.id == taskId) {
+                task.copy(haveDueDate = !task.haveDueDate)
+            } else {
+                task
+            }
+        }
+        saveTasks()
+    }
+
+    private fun updateDueDate(taskId: Int, dueDate: Long) {
+        taskList = taskList.map { task ->
+            if (task.id == taskId) {
+                task.copy(dueDate = dueDate)
             } else {
                 task
             }
@@ -121,7 +150,9 @@ class MainActivity : ComponentActivity() {
                     task = task,
                     saveTasks = ::saveTasks,
                     updateTaskTitle = ::updateTaskTitle,
-                    toggleCompleteTask = ::toggleCompleteTask
+                    toggleCompleteTask = ::toggleCompleteTask,
+                    toggleHaveDueDate = ::toggleHaveDueDate,
+                    updateDueDate = ::updateDueDate
                 )
             }
         }
@@ -183,6 +214,7 @@ fun SortByPicker(modifier: Modifier, onPriorityChange: (String) -> Unit, startin
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun TaskList(tasks: List<Task>, onDelete: (Int) -> Unit, onCompleteToggle: (Int) -> Unit, navController: NavHostController, modifier: Modifier = Modifier) {
     LazyColumn(

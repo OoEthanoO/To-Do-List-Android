@@ -3,10 +3,13 @@ package com.example.todolist
 import android.app.DatePickerDialog
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Checkbox
@@ -31,7 +34,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,32 +48,27 @@ fun TaskDetailScreen(
     task: Task?,
     saveTasks: () -> Unit,
     updateTaskTitle: (Int, String) -> Unit,
-    toggleCompleteTask: (Int) -> Unit
+    toggleCompleteTask: (Int) -> Unit,
+    toggleHaveDueDate: (Int) -> Unit,
+    updateDueDate: (Int, Long) -> Unit
 ) {
     var taskTitle by remember { mutableStateOf(task?.title ?: "") }
-    val selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    val showDatePicker = remember { mutableStateOf(false) }
+    val initialDate = if (task?.haveDueDate == true) {
+        Instant.ofEpochMilli(task.dueDate).atZone(ZoneId.systemDefault()).toLocalDate()
+    } else {
+        LocalDate.now()
+    }
+    val selectedDate = remember { mutableStateOf(initialDate) }
     val context = LocalContext.current
+    val zoneId = ZoneId.systemDefault()
 
-    if (showDatePicker.value) {
-        val datePickerDialog = DatePickerDialog(context, { _, _, _, _ ->
-            task?.let {
-                it.dueDate = selectedDate
-                it.haveDueDate = true
-                saveTasks()
-            }
-            showDatePicker.value = false
-        }, selectedDate.year, selectedDate.monthValue - 1, selectedDate.dayOfMonth)
-
-        datePickerDialog.setOnDismissListener {
+    fun showDatePicker() {
+        DatePickerDialog(context, { _, year, month, dayOfMonth ->
+            selectedDate.value = LocalDate.of(year, month + 1, dayOfMonth)
             if (task != null) {
-                task.haveDueDate = false
-                saveTasks()
+                updateDueDate(task.id, selectedDate.value.atStartOfDay(zoneId).toEpochSecond() * 1000)
             }
-            showDatePicker.value = false
-        }
-
-        datePickerDialog.show()
+        }, selectedDate.value.year, selectedDate.value.monthValue - 1, selectedDate.value.dayOfMonth).show()
     }
 
     Column {
@@ -132,22 +134,34 @@ fun TaskDetailScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Due Date", modifier = Modifier.weight(1f))
+                if (task.haveDueDate) {
+                    val date =
+                        task.dueDate.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() }
+                    val formatter = DateTimeFormatter.ofPattern("MM-dd-yyyy")
+                    val formattedDate = date?.format(formatter)
+                    if (formattedDate != null) {
+                        Box(
+                            modifier = Modifier
+                                .wrapContentSize()
+                                .weight(3f)
+                        ) {
+                            Text(
+                                text = formattedDate,
+                                modifier = Modifier
+                                    .clickable { showDatePicker() }
+                            )
+                        }
+                    }
+                }
                 Checkbox(
                     checked = task.haveDueDate,
                     onCheckedChange = { isChecked ->
-                        task.haveDueDate = isChecked
+                        toggleHaveDueDate(task.id)
                         if (isChecked) {
-                            showDatePicker.value = true
-                        } else {
-                            task.dueDate = null
+                            showDatePicker()
                         }
-                        saveTasks()
                     }
                 )
-            }
-
-            if (task.haveDueDate) {
-                Text("Selected Date: $selectedDate", modifier = Modifier.padding(start = 50.dp, top = 10.dp))
             }
         }
     }
