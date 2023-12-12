@@ -34,8 +34,14 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import java.time.Duration
+import java.time.LocalTime
+import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
 private var taskList by mutableStateOf(listOf<Task>())
@@ -59,6 +65,23 @@ class MainActivity : ComponentActivity() {
             saveTasks()
         }
 
+        val current = LocalTime.now()
+        val nineAM = LocalTime.of(9, 0)
+        var untilNine = Duration.between(current, nineAM)
+        if (untilNine.isNegative) {
+            untilNine = untilNine.plusDays(1)
+        }
+
+        val checkTasksWorkRequest = PeriodicWorkRequestBuilder<CheckTasksWorker>(24, TimeUnit.HOURS)
+            .setInitialDelay(untilNine.toMinutes(), TimeUnit.MINUTES)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "CheckTasks",
+            ExistingPeriodicWorkPolicy.KEEP,
+            checkTasksWorkRequest
+        )
+
         setContent {
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -66,16 +89,6 @@ class MainActivity : ComponentActivity() {
             ) {
                 Navigation()
             }
-        }
-    }
-
-    private fun loadTasks(): List<Task> {
-        val jsonTasks = sharedPreferences.getString("taskList", null)
-        return if (jsonTasks != null) {
-            val type = object : TypeToken<List<Task>>() {}.type
-            Gson().fromJson(jsonTasks, type)
-        } else {
-            emptyList()
         }
     }
 
@@ -282,4 +295,14 @@ private fun saveTasks() {
     sharedPreferences.edit().apply {
         putString("taskList", jsonTasks)
     }.apply()
+}
+
+fun loadTasks(): List<Task> {
+    val jsonTasks = sharedPreferences.getString("taskList", null)
+    return if (jsonTasks != null) {
+        val type = object : TypeToken<List<Task>>() {}.type
+        Gson().fromJson(jsonTasks, type)
+    } else {
+        emptyList()
+    }
 }

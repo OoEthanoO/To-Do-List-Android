@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -84,11 +85,14 @@ fun TaskRow(task: Task, onDelete: () -> Unit, onCompleteToggle: () -> Unit, onCl
                 val formatter = DateTimeFormatter.ofPattern("MM-dd-yyyy")
                 val formattedDate = date?.format(formatter)
                 if (formattedDate != null) {
+                    val isPastDue = date.isBefore(LocalDate.now())
                     Text(
                         text = formattedDate,
                         color =
                         if (task.isComplete) {
                             Color.Gray
+                        } else if (isPastDue) {
+                            Color.Red
                         } else {
                             when (task.priority) {
                                 "Low" -> {
